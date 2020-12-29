@@ -536,13 +536,16 @@ class UniswapV2Client(UniswapObject):
             address=Web3.toChecksumAddress(pair), abi=UniswapV2Client.PAIR_ABI)
         return pair_contract.functions.token1().call()
 
-    def get_reserves(self, token_a, token_b):
+    def get_reserves(self, token_a, token_b,
+                     block_identifier='latest'):
         """
         Gets the reserves of token_0 and token_1 used to price trades
         and distribute liquidity as well as the timestamp of the last block
         during which an interaction occurred for the pair.
 
-        :param pair: Address of the pair.
+        :param:
+            - token_a : address of token a
+            - token_b : address of token b
         :return:
             - reserve_0 - Amount of token_0 in the contract.
             - reserve_1 - Amount of token_1 in the contract.
@@ -554,10 +557,13 @@ class UniswapV2Client(UniswapObject):
                 UniswapV2Utils.pair_for(self.get_factory(), token_a, token_b)),
                 abi=UniswapV2Client.PAIR_ABI
             )
-        reserve = pair_contract.functions.getReserves().call()
+        reserve = pair_contract.functions.getReserves().call(
+            block_identifier=block_identifier
+        )
         return reserve if token0 == token_a else [reserve[1], reserve[0], reserve[2]]
 
-    def get_price_0_cumulative_last(self, pair):
+    def get_price_0_cumulative_last(self, pair,
+                                    block_identifier='latest'):
         """
         Gets the commutative price of the pair calculated relatively
         to token_0.
@@ -567,9 +573,12 @@ class UniswapV2Client(UniswapObject):
         """
         pair_contract = self.conn.eth.contract(
             address=Web3.toChecksumAddress(pair), abi=UniswapV2Client.PAIR_ABI)
-        return pair_contract.functions.price0CumulativeLast().call()
+        return pair_contract.functions.price0CumulativeLast().call(
+            block_identifier=block_identifier
+        )
 
-    def get_price_1_cumulative_last(self, pair):
+    def get_price_1_cumulative_last(self, pair,
+                                    block_identifier='latest'):
         """
         Gets the commutative price of the pair calculated relatively
         to token_1.
@@ -579,9 +588,12 @@ class UniswapV2Client(UniswapObject):
         """
         pair_contract = self.conn.eth.contract(
             address=Web3.toChecksumAddress(pair), abi=UniswapV2Client.PAIR_ABI)
-        return pair_contract.functions.price1CumulativeLast().call()
+        return pair_contract.functions.price1CumulativeLast().call(
+            block_identifier=block_identifier
+        )
 
-    def get_k_last(self, pair):
+    def get_k_last(self, pair,
+                   block_identifier='latest'):
         """
         Returns the product of the reserves as of the most recent
         liquidity event.
@@ -591,26 +603,30 @@ class UniswapV2Client(UniswapObject):
         """
         pair_contract = self.conn.eth.contract(
             address=Web3.toChecksumAddress(pair), abi=UniswapV2Client.PAIR_ABI)
-        return pair_contract.functions.kLast().call()
+        return pair_contract.functions.kLast().call(
+            block_identifier=block_identifier
+        )
 
-    def get_amounts_out(self, amount_in, path):
+    def get_amounts_out(self, amount_in, path,
+                        block_identifier='latest'):
         assert len(path) >= 2
         amounts = [amount_in]
         current_amount = amount_in
         for p0, p1 in zip(path, path[1:]):
-            r = self.get_reserves(p0, p1)
+            r = self.get_reserves(p0, p1, block_identifier)
             current_amount = UniswapV2Utils.get_amount_out(
                 current_amount, r[0], r[1]
             )
             amounts.append(current_amount)
         return amounts
 
-    def get_amounts_in(self, amount_out, path):
+    def get_amounts_in(self, amount_out, path,
+                       block_identifier='latest'):
         assert len(path) >= 2
         amounts = [amount_out]
         current_amount = amount_out
         for p0, p1 in reversed(list(zip(path, path[1:]))):
-            r = self.get_reserves(p0, p1)
+            r = self.get_reserves(p0, p1, block_identifier)
             current_amount = UniswapV2Utils.get_amount_in(
                 current_amount, r[0], r[1]
             )
