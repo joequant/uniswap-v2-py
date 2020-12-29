@@ -551,6 +551,9 @@ class UniswapV2Client(UniswapObject):
             - reserve_1 - Amount of token_1 in the contract.
             - liquidity - Unix timestamp of the block containing the last pair interaction.
         """
+        if block_identifier != 'latest':
+            return self.get_reserves_graphql(token_a, token_b,
+                                             block_identifier)
         (token0, token1) = UniswapV2Utils.sort_tokens(token_a, token_b)
         pair_contract = self.conn.eth.contract(
             address=Web3.toChecksumAddress(
@@ -561,6 +564,46 @@ class UniswapV2Client(UniswapObject):
             block_identifier=block_identifier
         )
         return reserve if token0 == token_a else [reserve[1], reserve[0], reserve[2]]
+
+    def get_reserves_graphql(self,
+                             token_a, token_b, block_number):
+        import requests
+        import bigfloat
+        (token0, token1) = UniswapV2Utils.sort_tokens(token_a, token_b)
+        pairs = self.get_pair(token_a, token_b)
+        query = """
+query {
+  pairs (block: {number: %d},
+    where: {
+      id: "%s",
+    }
+  ) {
+    id
+    reserve0
+    reserve1
+    token0 {
+      id
+      decimals
+    }
+    token1 {
+      id
+      decimals
+    }
+    createdAtTimestamp
+  }
+}
+""" % (block_number, pairs.lower())
+        request = requests.post('https://api.thegraph.com/subgraphs/name/{}'.format('uniswap/uniswap-v2'), json={'query': query})
+        if request.status_code != 200:
+            raise Exception("Query failed to run by returning code of {}. {}".format(request.status_code, query))
+        j = request.json()['data']['pairs'][0]
+        reserve0 = int(bigfloat.round((bigfloat.BigFloat(j['reserve0']) * \
+                    bigfloat.pow(10, int(j['token0']['decimals'])))))
+        reserve1 = int(bigfloat.round((bigfloat.BigFloat(j['reserve1']) * \
+                    bigfloat.pow(10, int(j['token1']['decimals'])))))
+        return [reserve0, reserve1, int(j['createdAtTimestamp'])] \
+            if j['token0']['id'] == token_a.lower() \
+               else [reserve1, reserve0, int(j['createdAtTimestamp'])]
 
     def get_price_0_cumulative_last(self, pair,
                                     block_identifier='latest'):

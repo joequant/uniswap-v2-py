@@ -16,12 +16,12 @@ setuptools.setup(
     url="https://github.com/asynctomatic/uniswap-v2-py",
     packages=setuptools.find_packages(),
     package_data={"uniswap": ["assets/*"]},
-    install_requires=["web3"],
+    install_requires=["web3", "bigfloat"],
     classifiers=[
         "Programming Language :: Python :: 3",
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
-    python_requires='>=3.6',
+    python_requires='>=3.7',
     test_suit="tests"
 )
