@@ -1,22 +1,26 @@
 import os
 import json
-from web3 import Web3
-from web3.exceptions import BadFunctionCallOutput
 import re
+from typing import Tuple, Union, Sequence, Optional, Any, List
+from web3 import Web3
+from web3.providers.base import BaseProvider
+from web3.exceptions import BadFunctionCallOutput
 
+numeric = Union[int, float]
+identifier = Union[int, str]
 class UniswapV2Utils(object):
 
     ZERO_ADDRESS = Web3.toHex(0x0)
 
     @staticmethod
-    def sort_tokens(token_a, token_b):
+    def sort_tokens(token_a: str, token_b: str) -> Tuple[str, str]:
         assert token_a != token_b
         (token_0, token_1) = (token_a, token_b) if int(token_a, 16) < int(token_b, 16) else (token_b, token_a)
         assert token_0 != UniswapV2Utils.ZERO_ADDRESS
         return token_0, token_1
 
     @staticmethod
-    def pair_for(factory, token_a, token_b):
+    def pair_for(factory, token_a: str, token_b: str) -> str:
         prefix = Web3.toHex(hexstr="ff")
         encoded_tokens = Web3.solidityKeccak(["address", "address"], UniswapV2Utils.sort_tokens(token_a, token_b))
         suffix = Web3.toHex(hexstr="96e8ac4277198ff8b6f785478aa9a39f403cb768dd02cbee326c3e7da348845f")
@@ -24,17 +28,19 @@ class UniswapV2Utils(object):
         return Web3.toChecksumAddress(Web3.toHex(raw)[-40:])
 
     @staticmethod
-    def get_reserves(factory, token_a, token_b):
+    def get_reserves(factory, token_a: str, token_b: str):
         pass  # TODO move to UniswapV2Client
 
     @staticmethod
-    def calculate_quote(amount_a, reserve_a, reserve_b):
+    def calculate_quote(amount_a: numeric, reserve_a: numeric, reserve_b: numeric) -> numeric:
         assert amount_a > 0
         assert reserve_a > 0 and reserve_b > 0
         return amount_a * (reserve_b/reserve_a)
 
     @staticmethod
-    def get_amount_out(amount_in, reserve_in, reserve_out):
+    def get_amount_out(amount_in: numeric,
+                       reserve_in: numeric,
+                       reserve_out: numeric) -> int:
         """
         Given an input asset amount, returns the maximum output amount of the
         other asset (accounting for fees) given reserves.
@@ -52,7 +58,9 @@ class UniswapV2Utils(object):
         return int(numerator/denominator)
 
     @staticmethod
-    def get_amount_in(amount_out, reserve_in, reserve_out):
+    def get_amount_in(amount_out: numeric,
+                      reserve_in: numeric,
+                      reserve_out: numeric) -> int:
         """
         Returns the minimum input asset amount required to buy the given
         output asset amount (accounting for fees) given reserves.
@@ -69,7 +77,7 @@ class UniswapV2Utils(object):
         return int(numerator/denominator + 1)
 
     @staticmethod
-    def get_amounts_out(amount_in, path):
+    def get_amounts_out(amount_in: numeric, path: Sequence[str]):
         """
         Given an input asset amount and an array of token addresses, calculates
         all subsequent maximum output token amounts by calling get_reserves
@@ -83,7 +91,7 @@ class UniswapV2Utils(object):
         pass  # TODO move to UniswapV2Client
 
     @staticmethod
-    def get_amounts_in(amount_out, path):
+    def get_amounts_in(amount_out: numeric, path: Sequence[str]):
         """
         Given an output asset amount and an array of token addresses,
         calculates all preceding minimum input token amounts by calling
@@ -99,11 +107,13 @@ class UniswapV2Utils(object):
 
 class UniswapObject(object):
 
-    def __init__(self, address, private_key, provider=None):
+    def __init__(self: UniswapObject,
+                 address: str, private_key: str, provider_uri: Optional[str]=None):
         self.address = Web3.toChecksumAddress(address)
         self.private_key = private_key
 
-        self.provider = os.environ["PROVIDER"] if not provider else provider
+        self.provider = os.environ["PROVIDER"] if not provider_uri else provider_uri
+        provider: Any
         if re.match(r'^https*:', self.provider):
             provider = Web3.HTTPProvider(self.provider, request_kwargs={"timeout": 60})
         elif re.match(r'^ws*:', self.provider):
@@ -147,7 +157,7 @@ class UniswapV2Client(UniswapObject):
 
     PAIR_ABI = json.load(open(os.path.abspath(f"{os.path.dirname(os.path.abspath(__file__))}/assets/" + "IUniswapV2Pair.json")))["abi"]
 
-    def __init__(self, address, private_key, provider=None):
+    def __init__(self, address : str, private_key : str, provider=None):
         super().__init__(address, private_key, provider)
         self.contract = self.conn.eth.contract(
             address=Web3.toChecksumAddress(UniswapV2Client.ADDRESS), abi=UniswapV2Client.ABI)
@@ -156,17 +166,19 @@ class UniswapV2Client(UniswapObject):
 
     # Utilities
     # -----------------------------------------------------------
-    def _is_approved(self, token, amount=MAX_APPROVAL_INT):
+    def _is_approved(self: UniswapV2Client, token: str, amount: int=MAX_APPROVAL_INT):
         erc20_contract = self.conn.eth.contract(
             address=Web3.toChecksumAddress(token), abi=UniswapV2Client.PAIR_ABI)
         print(erc20_contract, token)
         approved_amount = erc20_contract.functions.allowance(self.address, self.router.address).call()
         return approved_amount >= amount
 
-    def is_approved(self, token, amount=MAX_APPROVAL_INT):
+    def is_approved(self: UniswapV2Client,
+                    token: str, amount: int=MAX_APPROVAL_INT):
         return self._is_approved(token, amount)
 
-    def approve(self, token, max_approval=MAX_APPROVAL_INT):
+    def approve(self: UniswapV2Client,
+                token: str, max_approval: int=MAX_APPROVAL_INT):
         if self._is_approved(token, max_approval):
             return
 
@@ -183,7 +195,7 @@ class UniswapV2Client(UniswapObject):
 
     # Factory Read-Only Functions
     # -----------------------------------------------------------
-    def get_pair(self, token_a, token_b):
+    def get_pair(self, token_a: str, token_b: str) -> str:
         """
         Gets the address of the pair for token_a and token_b,
         if it has been created, else 0x0.
@@ -193,7 +205,7 @@ class UniswapV2Client(UniswapObject):
         addr_2 = self.conn.toChecksumAddress(token_b)
         return self.contract.functions.getPair(addr_1, addr_2).call()
 
-    def get_pair_by_index(self, pair_index):
+    def get_pair_by_index(self, pair_index: int) -> str:
         """
         Gets the address of the nth pair (0-indexed) created through
         the factory, or 0x0 if not enough pairs have been created yet.
@@ -228,7 +240,7 @@ class UniswapV2Client(UniswapObject):
 
     # Factory State-Changing Functions
     # -----------------------------------------------------------
-    def _create_pair(self, token_1, token_2):  # TODO remove deprecated
+    def _create_pair(self, token_1: str, token_2: str):  # TODO remove deprecated
         """
         Creates a pair for tokenA and tokenB if one does not exist already.
         :return: the created address of the pair.
@@ -239,7 +251,7 @@ class UniswapV2Client(UniswapObject):
 
     # Router Read-Only Functions
     # -----------------------------------------------------------
-    def get_factory(self, query_chain=False):
+    def get_factory(self: UniswapV2Client, query_chain: bool=False):
         """
         Returns the address for the factory contract.
 
@@ -261,7 +273,10 @@ class UniswapV2Client(UniswapObject):
 
     # Router State-Changing Functions
     # -----------------------------------------------------------
-    def add_liquidity(self, token_a, token_b, amount_a, amount_b, min_a, min_b, to, deadline):
+    def add_liquidity(self, token_a: str, token_b: str,
+                      amount_a: int, amount_b: int,
+                      min_a: int, min_b: int, to: str,
+                      deadline: numeric):
         """
         Add liquidity to a ERC20-ERC20 token pool.
 
@@ -284,7 +299,8 @@ class UniswapV2Client(UniswapObject):
         params = self._create_transaction_params(gas=3000000)  # FIXME
         return self._send_transaction(func, params)
 
-    def add_liquidity_eth(self, token, amount_token, amount_eth, min_token, min_eth, to, deadline):
+    def add_liquidity_eth(self, token: str, amount_token: int, amount_eth: int,
+                          min_token: int, min_eth: int, to: str, deadline: numeric):
         """
         Add liquidity to an ERC20-WETH pool with ETH.
 
@@ -305,7 +321,10 @@ class UniswapV2Client(UniswapObject):
         params = self._create_transaction_params(amount_eth)  # FIXME
         return self._send_transaction(func, params)
 
-    def remove_liquidity(self, token_a, token_b, liquidity, min_a, min_b, to, deadline):
+    def remove_liquidity(self,
+                         token_a: str, token_b: str,
+                         liquidity: int, min_a: int, min_b: int,
+                         to: str, deadline: numeric):
         """
         Remove liquidity from an ERC20-ERC20 pool.
 
@@ -325,7 +344,10 @@ class UniswapV2Client(UniswapObject):
         params = self._create_transaction_params()
         return self._send_transaction(func, params)
 
-    def remove_liquidity_eth(self, token, liquidity, min_token, min_eth, to, deadline):
+    def remove_liquidity_eth(self,
+                             token: str,
+                             liquidity: int, min_token: int, min_eth: int,
+                             to: str, deadline: numeric):
         """
         Remove liquidity from an ERC20-WETH pool and receive ETH.
 
@@ -345,7 +367,9 @@ class UniswapV2Client(UniswapObject):
         return self._send_transaction(func, params)
 
     def remove_liquidity_with_permit(
-            self, token_a, token_b, liquidity, min_a, min_b, to, deadline, approve_max, v, r, s):
+            self, token_a: str, token_b: str,
+            liquidity: int, min_a: int, min_b: int,
+            to: str, deadline, approve_max, v, r, s):
         """
         Remove liquidity from an ERC20-ERC20 pool without pre-approval, thanks to permit.
 
@@ -370,7 +394,10 @@ class UniswapV2Client(UniswapObject):
         return self._send_transaction(func, params)
 
     def remove_liquidity_eth_with_permit(
-            self,  token, liquidity, min_token, min_eth, to, deadline, approve_max, v, r, s):
+            self, token: str,
+            liquidity: int, min_token: int, min_eth: int,
+            to: str, deadline: numeric,
+            approve_max: int, v, r, s):
         """
         Remove liquidity from an ERC20-WETH pool and receive ETH without pre-approval, thanks to permit.
 
@@ -393,7 +420,10 @@ class UniswapV2Client(UniswapObject):
         params = self._create_transaction_params()
         return self._send_transaction(func, params)
 
-    def swap_exact_tokens_for_tokens(self, amount, min_out, path, to, deadline):
+    def swap_exact_tokens_for_tokens(self,
+                                     amount: int, min_out: int,
+                                     path: Sequence[str],
+                                     to: str, deadline: numeric):
         """
         Swaps an exact amount of input tokens for as many output tokens as
         possible, along the route determined by the path. The first element of
@@ -413,7 +443,9 @@ class UniswapV2Client(UniswapObject):
         params = self._create_transaction_params()
         return self._send_transaction(func, params)
 
-    def swap_tokens_for_exact_tokens(self, amount_out, amount_in_max, path, to, deadline):
+    def swap_tokens_for_exact_tokens(self,
+                                     amount_out: int, amount_in_max: int,
+                                     path: Sequence[str], to: str, deadline: numeric):
         """
         Receive an exact amount of output tokens for as few input tokens as
         possible, along the route determined by the path. The first element of
@@ -433,7 +465,9 @@ class UniswapV2Client(UniswapObject):
         params = self._create_transaction_params()
         return self._send_transaction(func, params)
 
-    def swap_exact_eth_for_tokens(self, amount, min_out, path, to, deadline):
+    def swap_exact_eth_for_tokens(self, amount: int, min_out: int,
+                                  path: Sequence[str], to: str,
+                                  deadline: numeric):
         """
         Swaps an exact amount of ETH for as many output tokens as possible,
         along the route determined by the path. The first element of path must
@@ -452,7 +486,8 @@ class UniswapV2Client(UniswapObject):
         params = self._create_transaction_params(amount)
         return self._send_transaction(func, params)
 
-    def swap_tokens_for_exact_eth(self, amount_out, amount_in_max, path, to, deadline):
+    def swap_tokens_for_exact_eth(self, amount_out: int, amount_in_max: int,
+                                  path: Sequence[str], to: str, deadline: numeric):
         """
         Receive an exact amount of ETH for as few input tokens as possible,
         along the route determined by the path. The first element of path is the
@@ -472,7 +507,8 @@ class UniswapV2Client(UniswapObject):
         params = self._create_transaction_params()
         return self._send_transaction(func, params)
 
-    def swap_exact_tokens_for_eth(self, amount, min_out, path, to, deadline):
+    def swap_exact_tokens_for_eth(self, amount: int, min_out: int,
+                                  path: Sequence[str], to: str, deadline: numeric):
         """
         Swaps an exact amount of tokens for as much ETH as possible, along
         the route determined by the path. The first element of path is the input
@@ -492,7 +528,8 @@ class UniswapV2Client(UniswapObject):
         params = self._create_transaction_params()
         return self._send_transaction(func, params)
 
-    def swap_eth_for_exact_tokens(self, amount_out, amount_in_max, path, to, deadline):
+    def swap_eth_for_exact_tokens(self, amount_out: int, amount_in_max: int,
+                                  path: Sequence[str], to: str, deadline: numeric):
         """
         Receive an exact amount of tokens for as little ETH as possible, along
         the route determined by the path. The first element of path must be
@@ -514,7 +551,7 @@ class UniswapV2Client(UniswapObject):
     # Pair Read-Only Functions
     # -----------------------------------------------------------
 
-    def get_token_0(self, pair):
+    def get_token_0(self, pair: str):
         """
         Gets the address of the pair token with the lower sort order.
 
@@ -525,7 +562,7 @@ class UniswapV2Client(UniswapObject):
             address=Web3.toChecksumAddress(pair), abi=UniswapV2Client.PAIR_ABI)
         return pair_contract.functions.token0().call()
 
-    def get_token_1(self, pair):
+    def get_token_1(self, pair: str):
         """
         Gets the address of the pair token with the lower sort order.
 
@@ -536,8 +573,8 @@ class UniswapV2Client(UniswapObject):
             address=Web3.toChecksumAddress(pair), abi=UniswapV2Client.PAIR_ABI)
         return pair_contract.functions.token1().call()
 
-    def get_reserves(self, token_a, token_b,
-                     block_identifier='latest'):
+    def get_reserves(self, token_a: str, token_b: str,
+                     block_identifier: identifier='latest') -> List[int]:
         """
         Gets the reserves of token_0 and token_1 used to price trades
         and distribute liquidity as well as the timestamp of the last block
@@ -553,7 +590,7 @@ class UniswapV2Client(UniswapObject):
         """
         if block_identifier != 'latest':
             return self.get_reserves_graphql(token_a, token_b,
-                                             block_identifier)
+                                             int(block_identifier))
         (token0, token1) = UniswapV2Utils.sort_tokens(token_a, token_b)
         pair_contract = self.conn.eth.contract(
             address=Web3.toChecksumAddress(
@@ -566,9 +603,10 @@ class UniswapV2Client(UniswapObject):
         return reserve if token0 == token_a else [reserve[1], reserve[0], reserve[2]]
 
     def get_reserves_graphql(self,
-                             token_a, token_b, block_number):
+                             token_a: str, token_b: str,
+                             block_number: int):
         import requests
-        import bigfloat
+        import bigfloat # type: ignore
         (token0, token1) = UniswapV2Utils.sort_tokens(token_a, token_b)
         pairs = self.get_pair(token_a, token_b)
         query = """
@@ -603,8 +641,8 @@ class UniswapV2Client(UniswapObject):
             if j['token0']['id'] == token_a.lower() \
                else [reserve1, reserve0, int(j['createdAtTimestamp'])]
 
-    def get_price_0_cumulative_last(self, pair,
-                                    block_identifier='latest'):
+    def get_price_0_cumulative_last(self, pair: str,
+                                    block_identifier: identifier='latest'):
         """
         Gets the commutative price of the pair calculated relatively
         to token_0.
@@ -618,8 +656,8 @@ class UniswapV2Client(UniswapObject):
             block_identifier=block_identifier
         )
 
-    def get_price_1_cumulative_last(self, pair,
-                                    block_identifier='latest'):
+    def get_price_1_cumulative_last(self, pair: str,
+                                    block_identifier: identifier='latest'):
         """
         Gets the commutative price of the pair calculated relatively
         to token_1.
@@ -633,8 +671,8 @@ class UniswapV2Client(UniswapObject):
             block_identifier=block_identifier
         )
 
-    def get_k_last(self, pair,
-                   block_identifier='latest'):
+    def get_k_last(self, pair: str,
+                   block_identifier: identifier='latest'):
         """
         Returns the product of the reserves as of the most recent
         liquidity event.
@@ -648,8 +686,9 @@ class UniswapV2Client(UniswapObject):
             block_identifier=block_identifier
         )
 
-    def get_amounts_out(self, amount_in, path,
-                        block_identifier='latest'):
+    def get_amounts_out(self, amount_in: int,
+                        path: Sequence[str],
+                        block_identifier: identifier='latest'):
         assert len(path) >= 2
         return self.get_amounts_out_from_reserves(
             amount_in,
@@ -659,8 +698,9 @@ class UniswapV2Client(UniswapObject):
             ]
         )
 
-    def get_amounts_in(self, amount_out, path,
-                       block_identifier='latest'):
+    def get_amounts_in(self, amount_out: int,
+                       path: Sequence[str],
+                       block_identifier: identifier='latest'):
         assert len(path) >= 2
         return self.get_amounts_in_from_reserves(
             amount_out,
@@ -671,7 +711,8 @@ class UniswapV2Client(UniswapObject):
         )
 
     def get_amounts_out_from_reserves(
-            self, amount_in, reserves):
+            self, amount_in: int,
+            reserves: Sequence[Sequence[int]]):
         amounts = [amount_in]
         current_amount = amount_in
         for r in reserves:
@@ -682,7 +723,8 @@ class UniswapV2Client(UniswapObject):
         return amounts
 
     def get_amounts_in_from_reserves(
-            self, amount_out, reserves):
+            self, amount_out: int,
+            reserves: Sequence[Sequence[int]]):
         amounts = [amount_out]
         current_amount = amount_out
         for r in reversed(reserves):
