@@ -107,7 +107,7 @@ class UniswapV2Utils(object):
 
 class UniswapObject(object):
 
-    def __init__(self: UniswapObject,
+    def __init__(self,
                  address: str, private_key: str, provider_uri: Optional[str]=None):
         self.address = Web3.toChecksumAddress(address)
         self.private_key = private_key
@@ -166,18 +166,18 @@ class UniswapV2Client(UniswapObject):
 
     # Utilities
     # -----------------------------------------------------------
-    def _is_approved(self: UniswapV2Client, token: str, amount: int=MAX_APPROVAL_INT):
+    def _is_approved(self, token: str, amount: int=MAX_APPROVAL_INT):
         erc20_contract = self.conn.eth.contract(
             address=Web3.toChecksumAddress(token), abi=UniswapV2Client.PAIR_ABI)
         print(erc20_contract, token)
         approved_amount = erc20_contract.functions.allowance(self.address, self.router.address).call()
         return approved_amount >= amount
 
-    def is_approved(self: UniswapV2Client,
+    def is_approved(self,
                     token: str, amount: int=MAX_APPROVAL_INT):
         return self._is_approved(token, amount)
 
-    def approve(self: UniswapV2Client,
+    def approve(self,
                 token: str, max_approval: int=MAX_APPROVAL_INT):
         if self._is_approved(token, max_approval):
             return
@@ -251,7 +251,7 @@ class UniswapV2Client(UniswapObject):
 
     # Router Read-Only Functions
     # -----------------------------------------------------------
-    def get_factory(self: UniswapV2Client, query_chain: bool=False):
+    def get_factory(self, query_chain: bool=False):
         """
         Returns the address for the factory contract.
 
