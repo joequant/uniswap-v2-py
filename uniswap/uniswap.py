@@ -651,23 +651,41 @@ class UniswapV2Client(UniswapObject):
     def get_amounts_out(self, amount_in, path,
                         block_identifier='latest'):
         assert len(path) >= 2
+        return self.get_amounts_out_from_reserves(
+            amount_in,
+            [
+                self.get_reserves(p0, p1, block_identifier) \
+                for p0, p1 in zip(path, path[1:])
+            ]
+        )
+
+    def get_amounts_in(self, amount_out, path,
+                       block_identifier='latest'):
+        assert len(path) >= 2
+        return self.get_amounts_in_from_reserves(
+            amount_out,
+            [
+                self.get_reserves(p0, p1, block_identifier) \
+                for p0, p1 in zip(path, path[1:])
+            ]
+        )
+
+    def get_amounts_out_from_reserves(
+            self, amount_in, reserves):
         amounts = [amount_in]
         current_amount = amount_in
-        for p0, p1 in zip(path, path[1:]):
-            r = self.get_reserves(p0, p1, block_identifier)
+        for r in reserves:
             current_amount = UniswapV2Utils.get_amount_out(
                 current_amount, r[0], r[1]
             )
             amounts.append(current_amount)
         return amounts
 
-    def get_amounts_in(self, amount_out, path,
-                       block_identifier='latest'):
-        assert len(path) >= 2
+    def get_amounts_in_from_reserves(
+            self, amount_out, reserves):
         amounts = [amount_out]
         current_amount = amount_out
-        for p0, p1 in reversed(list(zip(path, path[1:]))):
-            r = self.get_reserves(p0, p1, block_identifier)
+        for r in reversed(reserves):
             current_amount = UniswapV2Utils.get_amount_in(
                 current_amount, r[0], r[1]
             )
