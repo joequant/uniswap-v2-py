@@ -143,12 +143,7 @@ class UniswapObject(object):
 
 
 class UniswapV2Client(UniswapObject):
-
-    ADDRESS = "0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f"
-
     ABI = json.load(open(os.path.abspath(f"{os.path.dirname(os.path.abspath(__file__))}/assets/" + "IUniswapV2Factory.json")))["abi"]
-
-    ROUTER_ADDRESS = "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D"
     ROUTER_ABI = json.load(open(os.path.abspath(f"{os.path.dirname(os.path.abspath(__file__))}/assets/" + "IUniswapV2Router02.json")))["abi"]
 
     MAX_APPROVAL_HEX = "0x" + "f" * 64
@@ -157,12 +152,22 @@ class UniswapV2Client(UniswapObject):
 
     PAIR_ABI = json.load(open(os.path.abspath(f"{os.path.dirname(os.path.abspath(__file__))}/assets/" + "IUniswapV2Pair.json")))["abi"]
 
-    def __init__(self, address : str, private_key : str, provider=None):
+    def __init__(self, address: str, private_key : str,
+                 provider: Optional[str] = None,
+                 factory_address: str = "0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f",
+                 router_address: str = "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D",
+                 subgraph_endpoint: str = 'uniswap/uniswap-v2'
+                 ):
         super().__init__(address, private_key, provider)
+        self.factory_address = factory_address
+        self.router_address = router_address
         self.contract = self.conn.eth.contract(
-            address=Web3.toChecksumAddress(UniswapV2Client.ADDRESS), abi=UniswapV2Client.ABI)
+            address=Web3.toChecksumAddress(factory_address),
+            abi=UniswapV2Client.ABI)
         self.router = self.conn.eth.contract(
-            address=Web3.toChecksumAddress(UniswapV2Client.ROUTER_ADDRESS), abi=UniswapV2Client.ROUTER_ABI)
+            address=Web3.toChecksumAddress(router_address),
+            abi=UniswapV2Client.ROUTER_ABI)
+        self.subgraph_endpoint = subgraph_endpoint
 
     # Utilities
     # -----------------------------------------------------------
@@ -262,7 +267,7 @@ class UniswapV2Client(UniswapObject):
         """
         if query_chain:
             return self.router.functions.factory().call()
-        return UniswapV2Client.ADDRESS
+        return self.factory_address
 
     def get_weth_address(self):
         """
@@ -631,7 +636,10 @@ class UniswapV2Client(UniswapObject):
   }
 }
 """ % (block_number, pairs.lower())
-        request = requests.post('https://api.thegraph.com/subgraphs/name/{}'.format('uniswap/uniswap-v2'), json={'query': query})
+        request = requests.post(
+            'https://api.thegraph.com/subgraphs/name/{}'.format(self.subgraph_endpoint),
+            json={'query': query}
+        )
         if request.status_code != 200:
             raise Exception("Query failed to run by returning code of {}. {}".format(request.status_code, query))
         j = request.json()['data']['pair']
