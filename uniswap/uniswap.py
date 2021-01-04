@@ -217,6 +217,8 @@ class UniswapV2Client(UniswapObject):
             return self.contract.functions.allPairs(pair_index).call()
         except BadFunctionCallOutput:
             return "0x0000000000000000000000000000000000000000"
+        except ValueError:
+            return "0x0000000000000000000000000000000000000000"
 
     def get_num_pairs(self):
         """
