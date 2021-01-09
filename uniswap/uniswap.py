@@ -3,11 +3,12 @@ import json
 import re
 from typing import Tuple, Union, Sequence, Optional, Any, List
 from web3 import Web3
+from web3.types import BlockIdentifier
 from web3.providers.base import BaseProvider
 from web3.exceptions import BadFunctionCallOutput
 
 numeric = Union[int, float]
-identifier = Union[int, str]
+
 class UniswapV2Utils(object):
 
     ZERO_ADDRESS = Web3.toHex(0x0)
@@ -558,7 +559,7 @@ class UniswapV2Client(UniswapObject):
     # Pair Read-Only Functions
     # -----------------------------------------------------------
 
-    def get_token_0(self, pair: str):
+    def get_token_0(self, pair: str) -> str:
         """
         Gets the address of the pair token with the lower sort order.
 
@@ -569,7 +570,7 @@ class UniswapV2Client(UniswapObject):
             address=Web3.toChecksumAddress(pair), abi=UniswapV2Client.PAIR_ABI)
         return pair_contract.functions.token0().call()
 
-    def get_token_1(self, pair: str):
+    def get_token_1(self, pair: str) -> str:
         """
         Gets the address of the pair token with the lower sort order.
 
@@ -581,7 +582,7 @@ class UniswapV2Client(UniswapObject):
         return pair_contract.functions.token1().call()
 
     def get_reserves(self, token_a: str, token_b: str,
-                     block_identifier: identifier='latest') -> List[int]:
+                     block_identifier: BlockIdentifier='latest') -> List[int]:
         """
         Gets the reserves of token_0 and token_1 used to price trades
         and distribute liquidity as well as the timestamp of the last block
@@ -611,7 +612,7 @@ class UniswapV2Client(UniswapObject):
 
     def get_reserves_graphql(self,
                              token_a: str, token_b: str,
-                             block_number: int):
+                             block_number: int) -> List[int]:
         import requests
         import bigfloat # type: ignore
         (token0, token1) = UniswapV2Utils.sort_tokens(token_a, token_b)
@@ -652,7 +653,7 @@ class UniswapV2Client(UniswapObject):
                else [reserve1, reserve0, int(j['createdAtTimestamp'])]
 
     def get_price_0_cumulative_last(self, pair: str,
-                                    block_identifier: identifier='latest'):
+                                    block_identifier: BlockIdentifier='latest'):
         """
         Gets the commutative price of the pair calculated relatively
         to token_0.
@@ -667,7 +668,7 @@ class UniswapV2Client(UniswapObject):
         )
 
     def get_price_1_cumulative_last(self, pair: str,
-                                    block_identifier: identifier='latest'):
+                                    block_identifier: BlockIdentifier='latest'):
         """
         Gets the commutative price of the pair calculated relatively
         to token_1.
@@ -682,7 +683,7 @@ class UniswapV2Client(UniswapObject):
         )
 
     def get_k_last(self, pair: str,
-                   block_identifier: identifier='latest'):
+                   block_identifier: BlockIdentifier='latest'):
         """
         Returns the product of the reserves as of the most recent
         liquidity event.
@@ -698,7 +699,7 @@ class UniswapV2Client(UniswapObject):
 
     def get_amounts_out(self, amount_in: int,
                         path: Sequence[str],
-                        block_identifier: identifier='latest'):
+                        block_identifier: BlockIdentifier='latest') -> List[int]:
         assert len(path) >= 2
         return self.get_amounts_out_from_reserves(
             amount_in,
@@ -710,7 +711,7 @@ class UniswapV2Client(UniswapObject):
 
     def get_amounts_in(self, amount_out: int,
                        path: Sequence[str],
-                       block_identifier: identifier='latest'):
+                       block_identifier: BlockIdentifier='latest') -> List[int]:
         assert len(path) >= 2
         return self.get_amounts_in_from_reserves(
             amount_out,
@@ -722,7 +723,7 @@ class UniswapV2Client(UniswapObject):
 
     def get_amounts_out_from_reserves(
             self, amount_in: int,
-            reserves: Sequence[Sequence[int]]):
+            reserves: Sequence[Sequence[int]]) -> List[int]:
         amounts = [amount_in]
         current_amount = amount_in
         for r in reserves:
@@ -734,7 +735,7 @@ class UniswapV2Client(UniswapObject):
 
     def get_amounts_in_from_reserves(
             self, amount_out: int,
-            reserves: Sequence[Sequence[int]]):
+            reserves: Sequence[Sequence[int]]) -> List[int]:
         amounts = [amount_out]
         current_amount = amount_out
         for r in reversed(reserves):
