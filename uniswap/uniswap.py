@@ -9,6 +9,7 @@ from web3.exceptions import BadFunctionCallOutput
 
 numeric = Union[int, float]
 
+
 class UniswapV2Utils(object):
 
     ZERO_ADDRESS = Web3.toHex(0x0)
@@ -144,31 +145,42 @@ class UniswapObject(object):
 
 
 class UniswapV2Client(UniswapObject):
-    ABI = json.load(open(os.path.abspath(f"{os.path.dirname(os.path.abspath(__file__))}/assets/" + "IUniswapV2Factory.json")))["abi"]
-    ROUTER_ABI = json.load(open(os.path.abspath(f"{os.path.dirname(os.path.abspath(__file__))}/assets/" + "IUniswapV2Router02.json")))["abi"]
+    ABI: dict = json.load(open(os.path.abspath(f"{os.path.dirname(os.path.abspath(__file__))}/assets/" + "IUniswapV2Factory.json")))["abi"]
+    ROUTER_ABI: dict = json.load(open(os.path.abspath(f"{os.path.dirname(os.path.abspath(__file__))}/assets/" + "IUniswapV2Router02.json")))["abi"]
 
-    MAX_APPROVAL_HEX = "0x" + "f" * 64
-    MAX_APPROVAL_INT = int(MAX_APPROVAL_HEX, 16)
-    ERC20_ABI = json.load(open(os.path.abspath(f"{os.path.dirname(os.path.abspath(__file__))}/assets/" + "IUniswapV2ERC20.json")))["abi"]
+    MAX_APPROVAL_HEX: str = "0x" + "f" * 64
+    MAX_APPROVAL_INT: int = int(MAX_APPROVAL_HEX, 16)
+    ERC20_ABI: dict = json.load(open(os.path.abspath(f"{os.path.dirname(os.path.abspath(__file__))}/assets/" + "IUniswapV2ERC20.json")))["abi"]
 
-    PAIR_ABI = json.load(open(os.path.abspath(f"{os.path.dirname(os.path.abspath(__file__))}/assets/" + "IUniswapV2Pair.json")))["abi"]
+    PAIR_ABI: dict = json.load(open(os.path.abspath(f"{os.path.dirname(os.path.abspath(__file__))}/assets/" + "IUniswapV2Pair.json")))["abi"]
+
+    ROUTER_CONFIG: dict = {
+        'uniswap': {
+            'factory': '0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f',
+            'router': '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D',
+            'subgraph': 'uniswap/uniswap-v2'
+        },
+        'sushiswap': {
+            'factory': '0xC0AEe478e3658e2610c5F7A4A2E1777cE9e4f2Ac',
+            'router': '0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F',
+            'subgraph': 'zippoxer/sushiswap-subgraph-fork'
+        }
+    }
 
     def __init__(self, address: str, private_key : str,
                  provider: Optional[str] = None,
-                 factory_address: str = "0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f",
-                 router_address: str = "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D",
-                 subgraph_endpoint: str = 'uniswap/uniswap-v2'
+                 router_config: str = 'uniswap'
                  ):
         super().__init__(address, private_key, provider)
-        self.factory_address = factory_address
-        self.router_address = router_address
+        self.factory_address = self.ROUTER_CONFIG[router_config]['factory']
+        self.router_address = self.ROUTER_CONFIG[router_config]['router']
+        self.subgraph_endpoint = self.ROUTER_CONFIG[router_config]['subgraph']
         self.contract = self.conn.eth.contract(
-            address=Web3.toChecksumAddress(factory_address),
+            address=Web3.toChecksumAddress(self.factory_address),
             abi=UniswapV2Client.ABI)
         self.router = self.conn.eth.contract(
-            address=Web3.toChecksumAddress(router_address),
+            address=Web3.toChecksumAddress(self.router_address),
             abi=UniswapV2Client.ROUTER_ABI)
-        self.subgraph_endpoint = subgraph_endpoint
 
     # Utilities
     # -----------------------------------------------------------
