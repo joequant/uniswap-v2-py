@@ -205,7 +205,7 @@ class UniswapV2Client(UniswapObject):
             address=Web3.toChecksumAddress(token), abi=UniswapV2Client.ERC20_ABI)
 
         func = erc20_contract.functions.approve(self.router.address, max_approval)
-        params = self._create_transaction_params()
+        params = self._create_transaction_params(gas=100000)
         tx = self._send_transaction(func, params)
 
         # wait for transaction receipt
