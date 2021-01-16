@@ -22,10 +22,10 @@ class UniswapV2Utils(object):
         return token_0, token_1
 
     @staticmethod
-    def pair_for(factory, token_a: str, token_b: str) -> str:
+    def pair_for(factory, pair_hash, token_a: str, token_b: str) -> str:
         prefix = Web3.toHex(hexstr="ff")
         encoded_tokens = Web3.solidityKeccak(["address", "address"], UniswapV2Utils.sort_tokens(token_a, token_b))
-        suffix = Web3.toHex(hexstr="96e8ac4277198ff8b6f785478aa9a39f403cb768dd02cbee326c3e7da348845f")
+        suffix = Web3.toHex(hexstr=pair_hash)
         raw = Web3.solidityKeccak(["bytes", "address", "bytes", "bytes"], [prefix, factory, encoded_tokens, suffix])
         return Web3.toChecksumAddress(Web3.toHex(raw)[-40:])
 
@@ -158,11 +158,13 @@ class UniswapV2Client(UniswapObject):
         'uniswap': {
             'factory': '0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f',
             'router': '0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D',
+            'pair_hash': "96e8ac4277198ff8b6f785478aa9a39f403cb768dd02cbee326c3e7da348845f",
             'subgraph': 'uniswap/uniswap-v2'
         },
         'sushiswap': {
             'factory': '0xC0AEe478e3658e2610c5F7A4A2E1777cE9e4f2Ac',
             'router': '0xd9e1cE17f2641f24aE83637ab66a2cca9C378B9F',
+            'pair_hash': 'e18a34eb0e04b04f7a0ac29a6e80748dca96319b42c54d679cb821dca90c6303',
             'subgraph': 'zippoxer/sushiswap-subgraph-fork'
         }
     }
@@ -175,6 +177,7 @@ class UniswapV2Client(UniswapObject):
         self.factory_address = self.ROUTER_CONFIG[router_config]['factory']
         self.router_address = self.ROUTER_CONFIG[router_config]['router']
         self.subgraph_endpoint = self.ROUTER_CONFIG[router_config]['subgraph']
+        self.pair_hash = self.ROUTER_CONFIG[router_config]['pair_hash']
         self.contract = self.conn.eth.contract(
             address=Web3.toChecksumAddress(self.factory_address),
             abi=UniswapV2Client.ABI)
@@ -338,7 +341,7 @@ class UniswapV2Client(UniswapObject):
         """
         self.approve(token, amount_token)
         func = self.router.functions.addLiquidityETH(token, amount_token, min_token, min_eth, to, deadline)
-        params = self._create_transaction_params(amount_eth)  # FIXME
+        params = self._create_transaction_params(amount_eth, gas=250000)  # FIXME
         return self._send_transaction(func, params)
 
     def remove_liquidity(self,
@@ -361,7 +364,7 @@ class UniswapV2Client(UniswapObject):
         """
         self.approve(self.get_pair(token_a, token_b), liquidity)
         func = self.router.functions.removeLiquidity(token_a, token_b, liquidity, min_a, min_b, to, deadline)
-        params = self._create_transaction_params()
+        params = self._create_transaction_params(gas=250000)
         return self._send_transaction(func, params)
 
     def remove_liquidity_eth(self,
@@ -383,7 +386,7 @@ class UniswapV2Client(UniswapObject):
         """
         self.approve(self.get_pair(token, "0xc778417e063141139fce010982780140aa0cd5ab"), liquidity)  # FIXME hardcoded WETH address
         func = self.router.functions.removeLiquidityETH(token, liquidity, min_token, min_eth, to, deadline)
-        params = self._create_transaction_params()
+        params = self._create_transaction_params(gas=250000)
         return self._send_transaction(func, params)
 
     def remove_liquidity_with_permit(
@@ -410,7 +413,7 @@ class UniswapV2Client(UniswapObject):
         """
         func = self.router.functions.removeLiquidityWithPermit(
             token_a, token_b, liquidity, min_a, min_b, to, deadline, approve_max, v, r, s)
-        params = self._create_transaction_params()
+        params = self._create_transaction_params(gas=250000)
         return self._send_transaction(func, params)
 
     def remove_liquidity_eth_with_permit(
@@ -437,7 +440,7 @@ class UniswapV2Client(UniswapObject):
         """
         func = self.router.functions.removeLiquidityETHWithPermit(
             token, liquidity, min_token, min_eth, to, deadline, approve_max, v, r, s)
-        params = self._create_transaction_params()
+        params = self._create_transaction_params(gas=250000)
         return self._send_transaction(func, params)
 
     def swap_exact_tokens_for_tokens(self,
@@ -460,7 +463,7 @@ class UniswapV2Client(UniswapObject):
         """
         self.approve(path[0], amount)
         func = self.router.functions.swapExactTokensForTokens(amount, min_out, path, to, deadline)
-        params = self._create_transaction_params()
+        params = self._create_transaction_params(gas=250000)
         return self._send_transaction(func, params)
 
     def swap_tokens_for_exact_tokens(self,
@@ -482,7 +485,7 @@ class UniswapV2Client(UniswapObject):
         """
         self.approve(path[0], amount_out)
         func = self.router.functions.swapTokensForExactTokens(amount_out, amount_in_max, path, to, deadline)
-        params = self._create_transaction_params()
+        params = self._create_transaction_params(gas=250000)
         return self._send_transaction(func, params)
 
     def swap_exact_eth_for_tokens(self, amount: int, min_out: int,
@@ -503,7 +506,7 @@ class UniswapV2Client(UniswapObject):
         :return: Input token amount and all subsequent output token amounts.
         """
         func = self.router.functions.swapExactETHForTokens(min_out, path, to, deadline)
-        params = self._create_transaction_params(amount)
+        params = self._create_transaction_params(amount, gas=250000)
         return self._send_transaction(func, params)
 
     def swap_tokens_for_exact_eth(self, amount_out: int, amount_in_max: int,
@@ -524,7 +527,7 @@ class UniswapV2Client(UniswapObject):
         """
         self.approve(path[0], amount_in_max)
         func = self.router.functions.swapTokensForExactETH(amount_out, amount_in_max, path, to, deadline)
-        params = self._create_transaction_params()
+        params = self._create_transaction_params(gas=250000)
         return self._send_transaction(func, params)
 
     def swap_exact_tokens_for_eth(self, amount: int, min_out: int,
@@ -545,7 +548,7 @@ class UniswapV2Client(UniswapObject):
         """
         self.approve(path[0], amount)
         func = self.router.functions.swapExactTokensForETH(amount, min_out, path, to, deadline)
-        params = self._create_transaction_params()
+        params = self._create_transaction_params(gas=250000)
         return self._send_transaction(func, params)
 
     def swap_eth_for_exact_tokens(self, amount_out: int, amount_in_max: int,
@@ -565,7 +568,7 @@ class UniswapV2Client(UniswapObject):
         :return: Input token amount and all subsequent output token amounts.
         """
         func = self.router.functions.swapETHForExactTokens(amount_out, path, to, deadline)
-        params = self._create_transaction_params(amount_in_max)
+        params = self._create_transaction_params(amount_in_max, gas=250000)
         return self._send_transaction(func, params)
 
     # Pair Read-Only Functions
@@ -614,7 +617,9 @@ class UniswapV2Client(UniswapObject):
         (token0, token1) = UniswapV2Utils.sort_tokens(token_a, token_b)
         pair_contract = self.conn.eth.contract(
             address=Web3.toChecksumAddress(
-                UniswapV2Utils.pair_for(self.get_factory(), token_a, token_b)),
+                UniswapV2Utils.pair_for(self.get_factory(),
+                                        self.pair_hash,
+                                        token_a, token_b)),
                 abi=UniswapV2Client.PAIR_ABI
             )
         reserve = pair_contract.functions.getReserves().call(
