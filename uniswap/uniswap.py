@@ -128,14 +128,21 @@ class UniswapObject(object):
         if not self.conn.isConnected():
             raise RuntimeError("Unable to connect to provider at " + self.provider)
         self.gasPrice = self.conn.toWei(15, "gwei")
+        self.current_nonce = 0
 
     def _create_transaction_params(self, value=0, gas=1500000):
+        transaction_count = self.conn.eth.getTransactionCount(self.address)
+        if transaction_count >= self.current_nonce:
+            current_nonce = transaction_count
+        else:
+            current_nonce = self.current_nonce
+        self.current_nonce = current_nonce + 1
         return {
             "from": self.address,
             "value": value,
             'gasPrice': self.gasPrice,
             "gas": gas,
-            "nonce": self.conn.eth.getTransactionCount(self.address),
+            "nonce": current_nonce,
         }
 
     def _send_transaction(self, func, params):
